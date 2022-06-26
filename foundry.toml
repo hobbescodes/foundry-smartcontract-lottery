@@ -4,7 +4,7 @@ src = 'src'
 test = 'test'
 out = 'out'
 libs = ['lib']
-remappings = ['ds-test/=lib/ds-test/src/']
+remappings = ['ds-test/=lib/ds-test/src/', '@chainlink/=lib/chainlink-brownie-contracts/', '@std=lib/forge-std/src/', '@ds=lib/ds-test/src/']
 libraries = []
 cache = true
 force = false
