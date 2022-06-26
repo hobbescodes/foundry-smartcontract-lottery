@@ -9,7 +9,7 @@ import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
 error Raffle__SendMoreToEnterRaffle();
 error Raffle__TransferFailed();
 error Raffle__NotOpen();
-error Raffle__UpkeepNotNeeded(uint256 currentBalance, uint256 numPlayers, uint256 raffleState);
+error Raffle__UpkeepNotNeeded();
 
 contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     
@@ -70,7 +70,7 @@ contract Raffle is VRFConsumerBaseV2, KeeperCompatibleInterface {
     function performUpkeep(bytes calldata /* performData */) external override {
         (bool upkeepNeeded, ) = checkUpkeep("");
         if(!upkeepNeeded)
-         revert Raffle__UpkeepNotNeeded(address(this).balance, s_players.length, uint256(s_raffleState));
+         revert Raffle__UpkeepNotNeeded();
         s_raffleState = RaffleState.CALCULATING;
         uint256 requestId = i_vrfCoordinator.requestRandomWords(
         i_gasLane, // or key hash

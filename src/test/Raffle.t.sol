@@ -26,6 +26,7 @@ contract RaffleTest is Test {
     uint96 constant FUND_AMOUNT = 1 * 10**18;
 
     event RaffleEnter(address indexed player);
+    event RequestedRaffleWinner(uint256 indexed requestId);
 
     function setUp() public {
         staticTime = block.timestamp;
@@ -89,13 +90,100 @@ contract RaffleTest is Test {
         (bool upkeepNeeded, ) = raffle.checkUpkeep("0x");
         assertTrue(upkeepNeeded);
 
-
-        // TODO: Figure out how to act as Keeper.. 
-        //right now it just always reverts with InvalidConsumer() on the requestRandomWords()
-        raffle.performUpkeep("0x");
+        raffle.performUpkeep("");
 
         vm.expectRevert(Raffle__NotOpen.selector);
         hoax(player3);
         raffle.enterRaffle{ value: ENTRANCE_FEE }();
     }
+
+    function testUpkeepReturnsFalseIfNoEthHasBeenSent() public {
+        vm.warp(staticTime + INTERVAL + 1);
+        vm.roll(2);
+
+        (bool upkeepNeeded, ) = raffle.checkUpkeep("0x");
+        assertTrue(!upkeepNeeded);
+    }
+
+    function testUpkeepReturnsFalseIfRaffleIsNotOpen() public {
+        raffle.enterRaffle{ value: ENTRANCE_FEE }();
+
+        vm.warp(staticTime + INTERVAL + 1);
+        vm.roll(2);
+
+        raffle.performUpkeep("");
+
+        uint256 raffleState = raffle.getRaffleState();
+        (bool upkeepNeeded, ) = raffle.checkUpkeep("0x");
+        assertEq(raffleState, 1);
+        assertTrue(!upkeepNeeded);
+    }
+
+    function testUpkeepReturnsFalseIfEnoughTimeHasntPassed() public {
+        raffle.enterRaffle{ value: ENTRANCE_FEE }();
+
+        vm.warp(staticTime + INTERVAL - 1);
+        vm.roll(2);
+
+        // TODO: Figure out how to revert with calldata included in error message,
+        // had to change contract to make this work
+        vm.expectRevert(Raffle__UpkeepNotNeeded.selector);
+        raffle.performUpkeep("");
+
+        (bool upkeepNeeded, ) = raffle.checkUpkeep("0x");
+        assertTrue(!upkeepNeeded);
+    }
+
+    function testUpkeepReturnsTrueIfCriteriaIsMet() public {
+        raffle.enterRaffle{ value: ENTRANCE_FEE }();
+
+        vm.warp(staticTime + INTERVAL + 1);
+        vm.roll(2);
+
+        (bool upkeepNeeded, ) = raffle.checkUpkeep("0x");
+        assertTrue(upkeepNeeded);
+    }
+
+    function testPerformUpkeepCanRunIfUpkeepIsNeeded() public {
+        raffle.enterRaffle{ value: ENTRANCE_FEE }();
+
+        vm.warp(staticTime + INTERVAL + 1);
+        vm.roll(2);
+
+        (bool upkeepNeeded, ) = raffle.checkUpkeep("0x");
+        assertTrue(upkeepNeeded);
+
+        raffle.performUpkeep("0x");
+    }
+
+    //NOTE: also emits a requestId, idk how to access it though because performUpkeep doesnt return anything
+    function testPerformUpkeepUpdatesRaffleState() public {
+        raffle.enterRaffle{ value: ENTRANCE_FEE }();
+
+        vm.warp(staticTime + INTERVAL + 1);
+        vm.roll(2);
+
+        uint256 startingRaffleState = raffle.getRaffleState();
+        assertEq(startingRaffleState, 0);
+
+        raffle.performUpkeep("0x");
+
+        uint256 endingRaffleState = raffle.getRaffleState();
+        assertEq(endingRaffleState, 1);
+    }
+
+    function testFulfillRandomWordsCanOnlyBeCalledAfterPerformUpkeep() public {
+        raffle.enterRaffle{ value: ENTRANCE_FEE }();
+
+        vm.warp(staticTime + INTERVAL + 1);
+        vm.roll(2);
+
+        vm.expectRevert(bytes("nonexistent request"));
+        vrfCoordinator.fulfillRandomWords(0, address(raffle));
+
+        vm.expectRevert(bytes("nonexistent request"));
+        vrfCoordinator.fulfillRandomWords(1, address(raffle));
+    }
+
+    //TODO: Full test with verified winner... The randomness makes this tricky lol
 }
